@@ -1,7 +1,13 @@
+require('dotenv').config();   // MUST be first line
 const twilio = require('twilio');
 const OTP = require('../models/OTP');
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+// Log to verify env vars are loaded (remove after debugging)
+console.log('TWILIO_ACCOUNT_SID:', process.env.TWILIO_ACCOUNT_SID ? '✅ loaded' : '❌ missing');
+console.log('TWILIO_AUTH_TOKEN:', process.env.TWILIO_AUTH_TOKEN ? '✅ loaded' : '❌ missing');
+console.log('TWILIO_PHONE:', process.env.TWILIO_PHONE);
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -16,10 +22,9 @@ const sendOtp = async (mobile) => {
     await client.messages.create({
       body: message,
       to: mobile,
-      from: process.env.TWILIO_PHONE_NUMBER
-      
+      from: process.env.TWILIO_PHONE
     });
-console.log(`SMS sent to ${mobile}, SID: ${msg.sid}, OTP: ${otp}`);
+
     await OTP.findOneAndUpdate(
       { mobile },
       { otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
