@@ -1,20 +1,37 @@
+const twilio = require('twilio');
 const OTP = require('../models/OTP');
-const crypto = require('crypto');
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+const client = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
 const sendOtp = async (mobile) => {
   const otp = generateOtp();
-  // store in DB, expire in 10 minutes
-  await OTP.findOneAndUpdate(
-    { mobile },
-    { otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
-    { upsert: true }
-  );
-  // In production use Twilio
-  console.log(`OTP for ${mobile}: ${otp}`);
-  // await twilioClient.messages.create({ body: `KORA OTP: ${otp}`, to: mobile, from: process.env.TWILIO_PHONE });
-  return otp;
+  const message = `Your KORA verification code is: ${otp}. Valid for 10 minutes.`;
+
+  try {
+    await client.messages.create({
+      body: message,
+      to: mobile,
+      from: process.env.TWILIO_PHONE_NUMBER
+      
+    });
+console.log(`SMS sent to ${mobile}, SID: ${msg.sid}, OTP: ${otp}`);
+    await OTP.findOneAndUpdate(
+      { mobile },
+      { otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      { upsert: true }
+    );
+
+    console.log(`OTP sent to ${mobile}: ${otp}`);
+    return otp;
+  } catch (error) {
+    console.error('Twilio error:', error);
+    throw new Error('Failed to send OTP');
+  }
 };
 
 module.exports = sendOtp;
