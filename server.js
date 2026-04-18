@@ -1,4 +1,8 @@
+const dns = require('dns');
+// Force Node.js to use Google's reliable public DNS servers
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
