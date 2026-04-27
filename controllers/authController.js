@@ -86,19 +86,33 @@ exports.register = async (req, res) => {
 // ----------------------------------------------------------------------
 exports.loginWithUsername = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+    let { username, password } = req.body;
+    const identifier = username;
+
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Username/email and password required' });
     }
 
-    const account = await Account.findOne({ username });
+    // 1. Try exact match on username (case‑sensitive, as intended)
+    let account = await Account.findOne({ username: identifier });
+
+    // 2. If not found, try case‑insensitive match on email in Customer collection
     if (!account) {
-      return res.status(401).json({ error: 'Invalid username or password' });
+      // Create a case‑insensitive regex for the email
+      const emailRegex = new RegExp(`^${identifier}$`, 'i');
+      const customer = await Customer.findOne({ email: emailRegex });
+      if (customer) {
+        account = await Account.findById(customer.accountId);
+      }
+    }
+
+    if (!account) {
+      return res.status(401).json({ error: 'Invalid username/email or password' });
     }
 
     const isMatch = await bcrypt.compare(password, account.password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid username or password' });
+      return res.status(401).json({ error: 'Invalid username/email or password' });
     }
 
     const token = generateToken(account._id, account.role);
@@ -107,6 +121,7 @@ exports.loginWithUsername = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 // ----------------------------------------------------------------------
 // 3. MOBILE + OTP LOGIN
@@ -137,7 +152,7 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ error: 'Mobile and OTP required' });
     }
 
-    const otpRecord = await OTP.findOne({ mobile, otp });
+   const otpRecord = await OTP.findOne({ mobile, otp, purpose: 'login' });
     if (!otpRecord || otpRecord.expiresAt < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
