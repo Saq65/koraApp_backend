@@ -13,6 +13,7 @@ const riderRoutes = require('./routes/riderRoutes');
 const spRoutes = require('./routes/serviceProviderRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const locationRoutes = require('./routes/locationRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
 const { startCronJobs } = require('./utils/cronJobs');
 const mongoose = require('mongoose'); // at top
 
@@ -40,6 +41,7 @@ app.use('/api/riders', riderRoutes);
 app.use('/api/sp', spRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/location', locationRoutes);
+app.use('/api/services', serviceRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
