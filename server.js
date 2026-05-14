@@ -16,7 +16,9 @@ const locationRoutes = require('./routes/locationRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const { startCronJobs } = require('./utils/cronJobs');
 const mongoose = require('mongoose'); // at top
-
+const { apiLimiter } = require('./middleware/rateLimiter'); 
+app.set('trust proxy', 1);  // ← ADD THIS (real IP behind nginx/cloud proxy)
+app.use(apiLimiter);    
 connectDB();
 startCronJobs();
 
