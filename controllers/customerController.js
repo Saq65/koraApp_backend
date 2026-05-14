@@ -12,9 +12,31 @@ const fail = (res, msg,  code = 500) => res.status(code).json({ success: false, 
 
 exports.getProfile = async (req, res) => {
   try {
-    const customer = await Customer.findOne({ accountId: req.user.id });
-    if (!customer) return fail(res, 'Profile not found', 404);
-    return ok(res, customer);
+    const customer = await Customer.findOne({
+      accountId: req.user.id,
+    }).populate({
+      path: "accountId",
+      select: "mobile username role",
+    });
+
+    if (!customer) {
+      return fail(res, "Profile not found", 404);
+    }
+
+    return ok(res, {
+      _id: customer._id,
+      fullName: customer.fullName,
+      email: customer.email,
+      dob: customer.dob,
+      profilePhoto: customer.profilePhoto,
+      addresses: customer.addresses,
+      defaultAddressId: customer.defaultAddressId,
+
+      // from Account table
+      mobile: customer.accountId?.mobile,
+      username: customer.accountId?.username,
+      role: customer.accountId?.role,
+    });
   } catch (err) {
     return fail(res, err.message);
   }
