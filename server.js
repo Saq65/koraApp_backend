@@ -17,8 +17,8 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const { startCronJobs } = require('./utils/cronJobs');
 const mongoose = require('mongoose'); // at top
 const { apiLimiter } = require('./middleware/rateLimiter'); 
-app.set('trust proxy', 1);  // ← ADD THIS (real IP behind nginx/cloud proxy)
-app.use(apiLimiter);    
+
+ 
 connectDB();
 startCronJobs();
 
@@ -26,7 +26,8 @@ const app = express();
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
-
+app.set('trust proxy', 1);  // ← ADD THIS (real IP behind nginx/cloud proxy)
+app.use(apiLimiter);   
 app.get('/db-status', async (req, res) => {
   const state = mongoose.connection.readyState;
   // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting

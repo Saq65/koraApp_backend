@@ -3,7 +3,7 @@ const limiter=(windowMinutes,max,message)=>
     rateLimit({
         windowMs:windowMinutes*60*1000,
         max,
-        standardHeader:true,
+        standardHeaders:true,
         legacyHeaders:false,
         message:{success:false,message}
     })
