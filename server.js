@@ -17,7 +17,6 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const { startCronJobs } = require('./utils/cronJobs');
 const mongoose = require('mongoose'); // at top
 const { apiLimiter } = require('./middleware/rateLimiter'); 
-
  
 connectDB();
 startCronJobs();
@@ -40,6 +39,7 @@ app.use('/uploads', express.static('uploads'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/customers', customerRoutes);
+
 app.use('/api/riders', riderRoutes);
 app.use('/api/sp', spRoutes);
 app.use('/api/orders', orderRoutes);

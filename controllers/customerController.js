@@ -31,11 +31,14 @@ exports.updateProfile = async (req, res) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
-    const customer = await Customer.findOneAndUpdate(
-      { accountId: req.user.id },
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+   const customer = await Customer.findOneAndUpdate(
+  { accountId: req.user.id },
+  { $set: updates },
+  {
+    returnDocument: 'after',
+    runValidators: true
+  }
+);
 
     if (!customer) return fail(res, 'Profile not found', 404);
     return ok(res, customer);
