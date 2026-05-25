@@ -1,24 +1,21 @@
 const mongoose = require("mongoose");
 
 const OrderItemSchema = new mongoose.Schema({
-  category: {
+  serviceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Service",
+    required: true
+  },
+
+  serviceName: String,
+
+  categoryName: {
     type: String,
     required: true
   },
 
-  subCategory: {
+  subCategoryName: {
     type: String,
-    required: true
-  },
-
-  productName: {
-    type: String,
-    required: true
-  },
-
-  service: {
-    type: String,
-    enum: ["wash", "iron", "both"],
     required: true
   },
 
@@ -28,10 +25,16 @@ const OrderItemSchema = new mongoose.Schema({
     min: 1
   },
 
-  price: {
+  unitPrice: {
+    type: Number,
+    required: true
+  },
+
+  totalPrice: {
     type: Number,
     required: true
   }
+
 });
 
 const AddressSchema = new mongoose.Schema({

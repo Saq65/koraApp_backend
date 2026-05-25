@@ -1,8 +1,9 @@
 const Order = require("../models/Order");
+const Service = require("../models/Servicemodel");
+const Customer = require("../models/Customer");
 
-
-// Create Order
 exports.createOrder = async (req, res) => {
+
   try {
 
     const customerId = req.user.id;
@@ -14,13 +15,66 @@ exports.createOrder = async (req, res) => {
       paymentMethod
     } = req.body;
 
+
+    if (!items || items.length === 0) {
+
+      return res.status(400).json({
+        success: false,
+        message: "Cart empty"
+      })
+
+    }
+
+    let finalItems = [];
     let subtotal = 0;
 
-    items.forEach(item => {
-      subtotal += item.quantity * item.price;
-    });
 
-    const tax = subtotal * 0.05;
+    for (const item of items) {
+
+      const service = await Service.findById(
+        item.serviceId
+      );
+
+      if (!service) {
+
+        return res.status(400).json({
+          success: false,
+          message: `Invalid service`
+        })
+
+      }
+
+      const unitPrice =
+        service.pricePerKg;
+
+      const totalPrice =
+        unitPrice * item.quantity;
+
+      subtotal += totalPrice;
+
+      finalItems.push({
+
+        serviceId: service._id,
+        serviceName: service.name,
+
+        categoryName:
+          item.categoryName,
+
+        subCategoryName:
+          item.subCategoryName,
+
+        quantity: item.quantity,
+
+        unitPrice,
+        totalPrice
+
+      })
+
+    }
+
+
+    const tax = +(subtotal * 0.05).toFixed(2);
+
     const discount = 0;
 
     const totalAmount =
@@ -28,32 +82,41 @@ exports.createOrder = async (req, res) => {
       tax -
       discount;
 
-    const orderCount =
-      await Order.countDocuments();
 
     const orderNumber =
-      `KR-${1000 + orderCount + 1}`;
+      `KR${Date.now()}`;
 
-    const order =
-      await Order.create({
 
-        customerId,
-        orderNumber,
-        items,
-        subtotal,
-        tax,
-        discount,
-        totalAmount,
-        pickupAddress,
-        deliveryAddress,
-        paymentMethod,
-        statusHistory: [
-          {
-            status: "pending_sp"
-          }
-        ]
+    const order = await Order.create({
 
-      });
+      customerId,
+
+      orderNumber,
+
+      items: finalItems,
+
+      subtotal,
+
+      tax,
+
+      discount,
+
+      totalAmount,
+
+      pickupAddress,
+
+      deliveryAddress,
+
+      paymentMethod,
+
+      statusHistory: [
+        {
+          status: "pending_sp"
+        }
+      ]
+
+    });
+
 
     res.status(201).json({
 
@@ -61,20 +124,24 @@ exports.createOrder = async (req, res) => {
       message: "Order created",
       data: order
 
-    });
+    })
+
 
   }
   catch (error) {
+
+    console.log(error);
 
     res.status(500).json({
 
       success: false,
       message: error.message
 
-    });
+    })
 
   }
-};
+
+}
 
 
 
