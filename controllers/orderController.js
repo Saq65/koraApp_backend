@@ -370,40 +370,41 @@ exports.getActiveOrder = async (req, res) => {
       'pending_sp', 'sp_assigned', 'sp_accepted', 'rider_pickup_assigned',
       'picked_up', 'at_sp', 'cleaned', 'rider_delivery_assigned'
     ];
-    const order = await Order.findOne({
+    const orders = await Order.find({
       customerId: req.user.id,
       status: { $in: activeStatuses }
     }).sort({ createdAt: -1 });
 
-    if (!order) {
-      return res.status(200).json({ success: true, data: null });
+    if (!orders || orders.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
     }
 
-    // Format order summary
-    const orderSummary = {
-      id: order.orderNumber,
-      service: order.items[0]?.serviceName || 'Laundry',
-      items: order.items.reduce((sum, i) => sum + i.quantity, 0),
-      date: new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      price: order.totalAmount,
-      status: order.status,
-      iconName: 'package-variant'   // generic icon
-    };
-
-    const trackingSteps = buildTrackingSteps(order);
-
-    let cancellationDeadline = null;
-    if (order.createdAt && order.status === 'pending_sp') {
-      cancellationDeadline = new Date(new Date(order.createdAt).getTime() + 2 * 60 * 60 * 1000);
-    }
-
-    res.json({
-      success: true,
-      data: {
+    // Format each order
+    const formattedOrders = orders.map(order => {
+      const orderSummary = {
+        id: order.orderNumber,
+        service: order.items[0]?.serviceName || 'Laundry',
+        items: order.items.reduce((sum, i) => sum + i.quantity, 0),
+        date: new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        price: order.totalAmount,
+        status: order.status,
+        iconName: 'package-variant'
+      };
+      const trackingSteps = buildTrackingSteps(order);
+      let cancellationDeadline = null;
+      if (order.createdAt && order.status === 'pending_sp') {
+        cancellationDeadline = new Date(new Date(order.createdAt).getTime() + 2 * 60 * 60 * 1000);
+      }
+      return {
         order: orderSummary,
         tracking: trackingSteps,
         cancellationDeadline
-      }
+      };
+    });
+
+    res.json({
+      success: true,
+      data: formattedOrders
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
