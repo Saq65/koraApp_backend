@@ -2,7 +2,7 @@ const rateLimit =require("express-rate-limit")
 const limiter=(windowMinutes,max,message)=>
     rateLimit({
         windowMs:windowMinutes*60*1000,
-        max,
+        max,    
         standardHeaders:true,
         legacyHeaders:false,
         message:{success:false,message}
