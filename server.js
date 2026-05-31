@@ -15,6 +15,8 @@ const orderRoutes = require('./routes/orderRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const { startCronJobs } = require('./utils/cronJobs');
+const savedAddressRoutes = require('./routes/savedAddresses');
+
 const mongoose = require('mongoose'); // at top
 const { apiLimiter } = require('./middleware/rateLimiter'); 
  
@@ -44,6 +46,7 @@ app.use('/api/riders', riderRoutes);
 app.use('/api/sp', spRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/location', locationRoutes);
+app.use('/api/saved-addresses', savedAddressRoutes);
 app.use('/api/services', serviceRoutes);
 
 const PORT = process.env.PORT || 5000;
