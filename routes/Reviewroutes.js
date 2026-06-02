@@ -1,26 +1,22 @@
 const express = require("express");
 const router = express.Router();
+const { protect, restrictTo } = require("../middleware/auth");
 
 const {
   submitReview,
-  getMyReviews,
+  getMyReview,
   getAllReviews,
   getReviewStats,
   deleteReview,
 } = require("../controllers/reviewController");
 
-const { protect } = require("../middleware/auth");
-
-
+// Customer routes
 router.post("/", protect, submitReview);
+router.get("/my", protect, getMyReview);
 
-router.get("/my", protect, getMyReviews);
-
-
-router.get("/all", protect, getAllReviews);
-
-router.get("/stats", protect, getReviewStats);
-
-router.delete("/:id", protect, deleteReview);
+// Admin routes
+router.get("/all", protect, restrictTo("admin"), getAllReviews);
+router.get("/stats", protect, restrictTo("admin"), getReviewStats);
+router.delete("/:id", protect, restrictTo("admin"), deleteReview);
 
 module.exports = router;

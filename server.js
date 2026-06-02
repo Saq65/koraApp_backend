@@ -16,11 +16,11 @@ const locationRoutes = require('./routes/locationRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const { startCronJobs } = require('./utils/cronJobs');
 const savedAddressRoutes = require('./routes/savedAddresses');
-const reviewRoutes = require('./routes/Reviewroutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 const mongoose = require('mongoose'); // at top
-const { apiLimiter } = require('./middleware/rateLimiter'); 
- 
+const { apiLimiter } = require('./middleware/rateLimiter');
+
 connectDB();
 startCronJobs();
 
@@ -28,8 +28,8 @@ const app = express();
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
-app.set('trust proxy', 1);  
-app.use(apiLimiter);   
+app.set('trust proxy', 1);
+app.use(apiLimiter);
 app.get('/db-status', async (req, res) => {
   const state = mongoose.connection.readyState;
   // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
@@ -52,4 +52,4 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/reviews', reviewRoutes);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
