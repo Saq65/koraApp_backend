@@ -200,10 +200,8 @@ exports.getOrderDetails =
 
     try {
 
-      const order =
-        await Order.findById(
-          req.params.id
-        );
+      const order = await Order.findOne({ orderNumber: req.params.id }); // ← yeh badla
+
 
       if (!order) {
 
@@ -302,8 +300,8 @@ exports.updateStatus =
     }
 
   };
-  
-  // Helper: convert internal status to user-friendly label
+
+// Helper: convert internal status to user-friendly label
 const getStepLabel = (status) => {
   const map = {
     pending_sp: 'Order Placed',
@@ -342,7 +340,7 @@ const buildTrackingSteps = (order) => {
       const baseTime = history.find(h => h.status === 'cleaned')?.updatedAt || order.createdAt;
       if (baseTime) {
         const est = new Date(new Date(baseTime).getTime() + 2 * 60 * 60 * 1000);
-        time = `Est. ${est.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}`;
+        time = `Est. ${est.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       }
     }
     steps.push({
@@ -413,11 +411,17 @@ exports.getActiveOrder = async (req, res) => {
 
 // GET /api/orders/history
 exports.getOrderHistory = async (req, res) => {
+  
   try {
+        console.log("USER ID:", req.user.id);
+
+
     const historyOrders = await Order.find({
       customerId: req.user.id,
       status: { $in: ['delivered', 'cancelled'] }
     }).sort({ createdAt: -1 });
+        console.log("ORDERS FOUND:", historyOrders.length);
+
 
     const formatted = historyOrders.map(order => ({
       id: order.orderNumber,
