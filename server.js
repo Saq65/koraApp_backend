@@ -17,6 +17,7 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const { startCronJobs } = require('./utils/cronJobs');
 const savedAddressRoutes = require('./routes/savedAddresses');
 const reviewRoutes = require('./routes/reviewRoutes');
+const trackOrderRoutes = require('./routes/Trackorderroutes');
 
 const mongoose = require('mongoose'); // at top
 const { apiLimiter } = require('./middleware/rateLimiter');
@@ -50,6 +51,7 @@ app.use('/api/location', locationRoutes);
 app.use('/api/saved-addresses', savedAddressRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/track', trackOrderRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

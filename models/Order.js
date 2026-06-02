@@ -100,6 +100,10 @@ const OrderSchema = new mongoose.Schema({
 
   statusHistory: [{
     status: String,
+    note: {
+      type: String,
+      default: ""
+    },
     updatedAt: {
       type: Date,
       default: Date.now
