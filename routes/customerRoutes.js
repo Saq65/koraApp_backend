@@ -6,7 +6,8 @@ const {
   addAddress,
   updateAddress,
   deleteAddress,
-  setDefaultAddress
+  setDefaultAddress,
+  updateEmail
 } = require('../controllers/customerController');
 
 const { protect, restrictTo } = require('../middleware/auth');
@@ -67,4 +68,10 @@ router.put(
   setDefaultAddress
 );
 
+router.put(
+  '/profile/email',
+  protect,
+  restrictTo('customer'),
+  updateEmail
+);
 module.exports = router;
