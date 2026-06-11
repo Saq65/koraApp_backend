@@ -2,12 +2,12 @@ const express = require('express');
 
 const {
   getProfile,
+   requestEmailOtp, verifyEmailOtp, requestMobileOtp, verifyMobileOtp,
   updateProfile,
   addAddress,
   updateAddress,
   deleteAddress,
   setDefaultAddress,
-  updateEmail
 } = require('../controllers/customerController');
 
 const { protect, restrictTo } = require('../middleware/auth');
@@ -25,14 +25,12 @@ router.get(
   getProfile
 );
 
-// Update logged-in customer profile
-router.put(
-  '/profile',
-  protect,
-  restrictTo('customer'),
-  updateProfile
-);
 
+router.put('/profile', protect, updateProfile);
+router.post('/profile/request-email-otp', protect, requestEmailOtp);
+router.post('/profile/verify-email-otp', protect, verifyEmailOtp);
+router.post('/profile/request-mobile-otp', protect, requestMobileOtp);
+router.post('/profile/verify-mobile-otp', protect, verifyMobileOtp);
 
 // ─── ADDRESSES ───────────────────────────────────────────
 
@@ -68,10 +66,5 @@ router.put(
   setDefaultAddress
 );
 
-router.put(
-  '/profile/email',
-  protect,
-  restrictTo('customer'),
-  updateEmail
-);
+
 module.exports = router;
