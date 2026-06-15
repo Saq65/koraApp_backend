@@ -1,22 +1,20 @@
-
 const Customer = require('../models/Customer');
-
+const Account = require('../models/Account'); // ← needed to update email
+const bcrypt = require('bcrypt');
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
 const ok   = (res, data, code = 200) => res.status(code).json({ success: true,  data });
 const fail = (res, msg,  code = 500) => res.status(code).json({ success: false, message: msg });
 
 // ─── GET /api/customers/profile ─────────────────────────────────────────────
 // Returns the customer profile for the logged-in user.
 // req.user is set by the protect middleware: { id: accountId, role }
-
 exports.getProfile = async (req, res) => {
   try {
     const customer = await Customer.findOne({
       accountId: req.user.id,
     }).populate({
       path: "accountId",
-      select: "mobile username role",
+      select: "mobile email role",    // username removed, email added
     });
 
     if (!customer) {
@@ -26,15 +24,15 @@ exports.getProfile = async (req, res) => {
     return ok(res, {
       _id: customer._id,
       fullName: customer.fullName,
-      email: customer.email,
       dob: customer.dob,
       profilePhoto: customer.profilePhoto,
       addresses: customer.addresses,
       defaultAddressId: customer.defaultAddressId,
+      phone: customer.phone,          // if you keep it on Customer
 
-      // from Account table
+      // from Account table (email now comes from Account)
       mobile: customer.accountId?.mobile,
-      username: customer.accountId?.username,
+      email: customer.accountId?.email,   // ← email from Account
       role: customer.accountId?.role,
     });
   } catch (err) {
@@ -43,24 +41,25 @@ exports.getProfile = async (req, res) => {
 };
 
 // ─── PUT /api/customers/profile ─────────────────────────────────────────────
-// Update basic profile fields: fullName, email, dob, phone, profilePhoto
-
+// Update basic profile fields: fullName, dob, phone, profilePhoto
+// Email is NOT updated here – use a separate endpoint for email changes.
 exports.updateProfile = async (req, res) => {
   try {
-    const allowed = ['fullName', 'email', 'dob', 'phone', 'profilePhoto'];
+    // Removed 'email' – email belongs to Account, not Customer
+    const allowed = ['fullName', 'dob', 'phone', 'profilePhoto'];
     const updates = {};
     allowed.forEach(field => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
-   const customer = await Customer.findOneAndUpdate(
-  { accountId: req.user.id },
-  { $set: updates },
-  {
-    returnDocument: 'after',
-    runValidators: true
-  }
-);
+    const customer = await Customer.findOneAndUpdate(
+      { accountId: req.user.id },
+      { $set: updates },
+      {
+        returnDocument: 'after',
+        runValidators: true
+      }
+    );
 
     if (!customer) return fail(res, 'Profile not found', 404);
     return ok(res, customer);
@@ -69,9 +68,42 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// (Optional) Separate endpoint to update email (if needed)
+// PUT /api/customers/email
+exports.updateEmail = async (req, res) => {
+  try {
+    const { newEmail, currentPassword } = req.body;
+    if (!newEmail || !currentPassword) {
+      return fail(res, 'New email and current password are required', 400);
+    }
+
+    // 1. Get account and verify password
+    const account = await Account.findById(req.user.id);
+    if (!account) return fail(res, 'Account not found', 404);
+
+    const isMatch = await bcrypt.compare(currentPassword, account.password);
+    if (!isMatch) return fail(res, 'Current password is incorrect', 401);
+
+    // 2. Check if new email already in use
+    const existing = await Account.findOne({ email: newEmail.toLowerCase() });
+    if (existing) return fail(res, 'Email already registered', 409);
+
+    // 3. Update email
+    account.email = newEmail.toLowerCase();
+    await account.save();
+
+    // 4. (Optional) Send OTP to new email to verify? Actually best practice is to verify first.
+    // For full security, you should first send an OTP to the new email, then confirm.
+    // But this simplified version updates immediately after password check.
+
+    return ok(res, { email: account.email });
+  } catch (err) {
+    return fail(res, err.message);
+  }
+};
+
 // ─── POST /api/customers/addresses ──────────────────────────────────────────
 // Add a new address. Body: { label, addressLine, city, pincode, coordinates }
-
 exports.addAddress = async (req, res) => {
   try {
     const { label, addressLine, city, pincode, coordinates } = req.body;
@@ -99,7 +131,6 @@ exports.addAddress = async (req, res) => {
 
 // ─── PUT /api/customers/addresses/:addressId ────────────────────────────────
 // Edit an existing address.
-
 exports.updateAddress = async (req, res) => {
   try {
     const { addressId } = req.params;
@@ -126,7 +157,6 @@ exports.updateAddress = async (req, res) => {
 
 // ─── DELETE /api/customers/addresses/:addressId ─────────────────────────────
 // Remove an address. If it was default, clear defaultAddressId.
-
 exports.deleteAddress = async (req, res) => {
   try {
     const { addressId } = req.params;
@@ -137,9 +167,9 @@ exports.deleteAddress = async (req, res) => {
     const addr = customer.addresses.id(addressId);
     if (!addr) return fail(res, 'Address not found', 404);
 
-    addr.deleteOne();  // remove subdoc
+    addr.deleteOne();
 
-    // If deleted address was the default, clear it (frontend can prompt user to pick new default)
+    // If deleted address was the default, clear it
     if (customer.defaultAddressId?.toString() === addressId) {
       customer.defaultAddressId = undefined;
     }
@@ -153,7 +183,6 @@ exports.deleteAddress = async (req, res) => {
 
 // ─── PUT /api/customers/addresses/:addressId/default ────────────────────────
 // Mark an address as the default delivery address.
-
 exports.setDefaultAddress = async (req, res) => {
   try {
     const { addressId } = req.params;

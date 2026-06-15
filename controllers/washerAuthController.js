@@ -7,28 +7,25 @@ const generateToken = (id) =>
   jwt.sign({ id, role: "washer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 // POST /api/washer/auth/register
+// washerAuthController.js mein register function temporarily debug karo:
 exports.register = async (req, res) => {
   try {
     const { name, phone, password } = req.body;
-
-    if (!name || !phone || !password)
-      return res.status(400).json({ success: false, message: "All fields required" });
+    console.log('Register called:', { name, phone });
 
     const exists = await Washer.findOne({ phone });
-    if (exists)
-      return res.status(400).json({ success: false, message: "Phone already registered" });
+    console.log('Exists:', exists ? 'yes' : 'no');
 
+    if (exists) return res.status(400).json({ success: false, message: "Phone already registered" });
+
+    console.log('Creating washer...');
     const washer = await Washer.create({ name, phone, password });
+    console.log('Washer created:', washer._id);
 
     const token = generateToken(washer._id);
-
-    res.status(201).json({
-      success: true,
-      message: "Registered successfully",
-      token,
-      washer: { id: washer._id, name: washer.name, phone: washer.phone },
-    });
+    res.status(201).json({ success: true, token, washer: { id: washer._id, name: washer.name, phone: washer.phone } });
   } catch (err) {
+    console.log('Register error:', err.stack); // ← stack trace
     res.status(500).json({ success: false, message: err.message });
   }
 };

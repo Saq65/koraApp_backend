@@ -3,7 +3,8 @@ const Customer = require('../models/Customer');
 const Rider = require('../models/Rider');
 const ServiceProvider = require('../models/ServiceProvider');
 const OTP = require('../models/OTP');
-const sendOtpUtil = require('../utils/sendOtp');
+const sendOtpSms = require('../utils/sendOtp');   // your existing SMS util
+const sendEmailOtp = require('../utils/sendEmail');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -12,7 +13,6 @@ const generateToken = (accountId, role) => {
 };
 
 const createProfile = async (accountId, role, profileData) => {
-  console.log('Creating profile for', role, profileData);
   switch (role) {
     case 'customer':
       return await Customer.create({ accountId, ...profileData });
@@ -26,93 +26,73 @@ const createProfile = async (accountId, role, profileData) => {
 };
 
 // ----------------------------------------------------------------------
-// 1. REGISTRATION (username + password + mobile + profile)
+// 1. REGISTRATION (email, mobile, password, role, profile data)
 // ----------------------------------------------------------------------
-
-
 exports.register = async (req, res) => {
-  console.log('1. Register endpoint hit'); // ✅
   try {
-    console.log('2. Body:', req.body);
-    const { username, password, mobile, role, ...profileData } = req.body;
+    const { email, mobile, password, role, ...profileData } = req.body;
 
-    if (!username || !password || !mobile || !role) {
-      console.log('3. Missing fields');
-      return res.status(400).json({ error: 'Username, password, mobile and role are required' });
+    if (!email || !mobile || !password || !role) {
+      return res.status(400).json({ error: 'Email, mobile, password and role are required' });
     }
 
-    console.log('4. Checking existing username');
-    const existingUsername = await Account.findOne({ username });
-    if (existingUsername) {
-      console.log('5. Username taken');
-      return res.status(409).json({ error: 'Username already taken' });
+    // Check if email already exists
+    const existingEmail = await Account.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
+      return res.status(409).json({ error: 'Email already registered' });
     }
 
-    console.log('6. Checking existing mobile');
+    // Check if mobile already exists
     const existingMobile = await Account.findOne({ mobile });
     if (existingMobile) {
-      console.log('7. Mobile taken');
       return res.status(409).json({ error: 'Mobile already registered' });
     }
 
-    console.log('8. Hashing password');
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    console.log('9. Creating account');
     const account = await Account.create({
-      username,
+      email: email.toLowerCase(),
       mobile,
       password: hashedPassword,
       role,
       isVerified: true
     });
 
-    console.log('10. Creating profile for role:', role);
     await createProfile(account._id, role, profileData);
 
-    console.log('11. Generating token');
     const token = generateToken(account._id, role);
-
-    console.log('12. Sending response');
     res.status(201).json({ token, role });
   } catch (err) {
-    console.error('ERROR in register:', err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
 // ----------------------------------------------------------------------
-// 2. LOGIN WITH USERNAME + PASSWORD
+// 2. LOGIN WITH EMAIL OR MOBILE + PASSWORD
 // ----------------------------------------------------------------------
-exports.loginWithUsername = async (req, res) => {
+exports.login = async (req, res) => {
   try {
-    let { username, password } = req.body;
-    const identifier = username;
-
+    const { identifier, password } = req.body; // identifier = email OR mobile
     if (!identifier || !password) {
-      return res.status(400).json({ error: 'Username/email and password required' });
+      return res.status(400).json({ error: 'Email/mobile and password required' });
     }
 
-    // 1. Try exact match on username (case‑sensitive, as intended)
-    let account = await Account.findOne({ username: identifier });
-
-    // 2. If not found, try case‑insensitive match on email in Customer collection
-    if (!account) {
-      // Create a case‑insensitive regex for the email
-      const emailRegex = new RegExp(`^${identifier}$`, 'i');
-      const customer = await Customer.findOne({ email: emailRegex });
-      if (customer) {
-        account = await Account.findById(customer.accountId);
-      }
+    let account;
+    const isEmail = identifier.includes('@');
+    if (isEmail) {
+      account = await Account.findOne({ email: identifier.toLowerCase() });
+    } else {
+      account = await Account.findOne({ mobile: identifier });
     }
 
     if (!account) {
-      return res.status(401).json({ error: 'Invalid username/email or password' });
+      return res.status(401).json({ error: 'Invalid email/mobile or password' });
     }
 
     const isMatch = await bcrypt.compare(password, account.password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid username/email or password' });
+      return res.status(401).json({ error: 'Invalid email/mobile or password' });
     }
 
     const token = generateToken(account._id, account.role);
@@ -122,98 +102,75 @@ exports.loginWithUsername = async (req, res) => {
   }
 };
 
-
 // ----------------------------------------------------------------------
-// 3. MOBILE + OTP LOGIN
+// 3. FORGOT PASSWORD – Send OTP to email or mobile
 // ----------------------------------------------------------------------
-// Step A: Send OTP (only if mobile exists)
-exports.sendOtp = async (req, res) => {
+exports.forgotPassword = async (req, res) => {
   try {
-    const { mobile } = req.body;
-    if (!mobile) return res.status(400).json({ error: 'Mobile number required' });
-
-    const account = await Account.findOne({ mobile });
-    if (!account) {
-      return res.status(404).json({ error: 'User not registered' });
+    const { identifier } = req.body;
+    if (!identifier) {
+      return res.status(400).json({ error: 'Email or mobile is required' });
     }
 
-    await sendOtpUtil(mobile);
-    res.json({ message: 'OTP sent successfully' });
+    const isEmail = identifier.includes('@');
+    let account;
+
+    if (isEmail) {
+      account = await Account.findOne({ email: identifier.toLowerCase() });
+    } else {
+      account = await Account.findOne({ mobile: identifier });
+    }
+
+    if (!account) {
+      return res.status(404).json({ error: 'No account found with this email or mobile' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store OTP (overwrite any existing for same contact & purpose)
+    await OTP.findOneAndUpdate(
+      { contact: identifier, purpose: 'reset' },
+      { otp, expiresAt },
+      { upsert: true, new: true }
+    );
+
+    // Send OTP
+    if (isEmail) {
+      await sendEmailOtp(identifier, otp);
+    } else {
+      await sendOtpSms(identifier, 'reset'); // assumes your SMS util accepts mobile and purpose
+    }
+
+    res.json({ message: `OTP sent to your ${isEmail ? 'email' : 'mobile'}` });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// Step B: Verify OTP and login
-exports.verifyOtp = async (req, res) => {
+// ----------------------------------------------------------------------
+// 4. VERIFY RESET OTP
+// ----------------------------------------------------------------------
+exports.verifyResetOtp = async (req, res) => {
   try {
-    const { mobile, otp } = req.body;
-    if (!mobile || !otp) {
-      return res.status(400).json({ error: 'Mobile and OTP required' });
+    const { identifier, otp } = req.body;
+    if (!identifier || !otp) {
+      return res.status(400).json({ error: 'Identifier and OTP required' });
     }
 
-   const otpRecord = await OTP.findOne({ mobile, otp, purpose: 'login' });
+    const otpRecord = await OTP.findOne({ contact: identifier, otp, purpose: 'reset' });
     if (!otpRecord || otpRecord.expiresAt < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
-    const account = await Account.findOne({ mobile });
-    if (!account) {
-      return res.status(404).json({ error: 'User not registered' });
-    }
-
     // Delete used OTP
     await OTP.deleteOne({ _id: otpRecord._id });
 
-    const token = generateToken(account._id, account.role);
-    res.json({ token, role: account.role });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ----------------------------------------------------------------------
-// 5. FORGOT PASSWORD – Send reset OTP
-// ----------------------------------------------------------------------
-exports.forgotPassword = async (req, res) => {
-  try {
-    const { mobile } = req.body;
-    if (!mobile) return res.status(400).json({ error: 'Mobile number required' });
-
-    // Check if account exists
-    const account = await Account.findOne({ mobile });
-    if (!account) {
-      return res.status(404).json({ error: 'No account found with this mobile number' });
-    }
-    
-await sendOtpUtil(mobile, 'reset');
-    res.json({ message: 'Reset code sent successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ----------------------------------------------------------------------
-// 6. VERIFY RESET OTP – Returns short-lived reset token
-// ----------------------------------------------------------------------
-exports.verifyResetOtp = async (req, res) => {
-  try {
-    const { mobile, otp } = req.body;
-    if (!mobile || !otp) {
-      return res.status(400).json({ error: 'Mobile and OTP required' });
-    }
-
-    const otpRecord = await OTP.findOne({ mobile, otp, purpose: 'reset' });
-    if (!otpRecord || otpRecord.expiresAt < new Date()) {
-      return res.status(400).json({ error: 'Invalid or expired reset code' });
-    }
-
-    // Delete used OTP
-    await OTP.deleteOne({ _id: otpRecord._id });
-
-    // Generate reset token (short expiry: 15 minutes)
+    // Generate short-lived reset token
     const resetToken = jwt.sign(
-      { mobile, purpose: 'reset' },
+      { identifier, purpose: 'reset' },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }
     );
@@ -225,7 +182,7 @@ exports.verifyResetOtp = async (req, res) => {
 };
 
 // ----------------------------------------------------------------------
-// 7. RESET PASSWORD – Using reset token
+// 5. RESET PASSWORD (using resetToken)
 // ----------------------------------------------------------------------
 exports.resetPassword = async (req, res) => {
   try {
@@ -234,16 +191,13 @@ exports.resetPassword = async (req, res) => {
     if (!resetToken || !newPassword) {
       return res.status(400).json({ error: 'Reset token and new password required' });
     }
-
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ error: 'Passwords do not match' });
     }
-
     if (newPassword.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    // Verify reset token
     let decoded;
     try {
       decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
@@ -255,29 +209,32 @@ exports.resetPassword = async (req, res) => {
       return res.status(401).json({ error: 'Invalid token purpose' });
     }
 
-    const { mobile } = decoded;
+    const { identifier } = decoded;
+    let account;
 
-    // Find account
-    const account = await Account.findOne({ mobile });
+    if (identifier.includes('@')) {
+      account = await Account.findOne({ email: identifier.toLowerCase() });
+    } else {
+      account = await Account.findOne({ mobile: identifier });
+    }
+
     if (!account) {
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     account.password = hashedPassword;
     await account.save();
 
-    res.json({ message: 'Password reset successful' });
+    res.json({ message: 'Password reset successful. You can now log in.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
 // ----------------------------------------------------------------------
-// 4. LOGOUT (optional)
+// 6. LOGOUT (optional)
 // ----------------------------------------------------------------------
 exports.logout = (req, res) => {
   res.json({ message: 'Logged out successfully' });
 };
-

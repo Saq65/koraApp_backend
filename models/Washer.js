@@ -10,17 +10,14 @@ const WasherSchema = new mongoose.Schema({
     isVerified: { type: Boolean, default: false },
 }, { timestamps: true });
 
-WasherSchema.pre("save", function (next) {
-    if (!this.isModified("password")) return next();
-    const self = this;
-    bcrypt.genSalt(10, function (err, salt) {
-        if (err) return next(err);
-        bcrypt.hash(self.password, salt, function (err, hash) {
-            if (err) return next(err);
-            self.password = hash;
-            next();
-        });
-    });
+WasherSchema.pre("save", async function () {
+    if (!this.isModified("password")) return;
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+    } catch (err) {
+        throw err;
+    }
 });
 
 module.exports = mongoose.model("Washer", WasherSchema);

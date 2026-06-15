@@ -4,7 +4,7 @@ require('dotenv').config();
 
 const express = require('express');
 const { createServer } = require('http');
-const { initSocket } = require('./socket/trackingSocket');  
+const { initSocket, getIO } = require('./socket/trackingSocket'); 
 const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/db');
@@ -20,8 +20,7 @@ const savedAddressRoutes = require('./routes/savedAddresses');
 const reviewRoutes = require('./routes/reviewRoutes');
 const trackOrderRoutes = require('./routes/trackOrderRoutes');
 const washerRoutes = require("./routes/washerRoutes");
-
-const mongoose = require('mongoose'); // at top
+const mongoose = require('mongoose');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 connectDB();
@@ -35,6 +34,15 @@ app.use(helmet());
 app.use(express.json());
 app.set('trust proxy', 1);
 app.use(apiLimiter);
+
+// ── initSocket pehle karo ──
+initSocket(httpServer);
+
+// ── io ko req mein attach karo — ROUTES SE PEHLE ──
+app.use((req, res, next) => {
+  req.io = getIO();  // ← getIO() se instance lo
+  next();
+});
 
 app.get('/db-status', async (req, res) => {
   const state = mongoose.connection.readyState;
@@ -56,8 +64,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/track', trackOrderRoutes);
 app.use("/api/washer", washerRoutes);
-
-initSocket(httpServer);  
+app.use('/api/riders', riderRoutes);
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

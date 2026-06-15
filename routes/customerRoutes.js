@@ -1,4 +1,5 @@
 const express = require('express');
+const Customer = require('../models/Customer');
 
 const {
   getProfile,
@@ -6,68 +7,30 @@ const {
   addAddress,
   updateAddress,
   deleteAddress,
-  setDefaultAddress
+  setDefaultAddress,
+  updateEmail
 } = require('../controllers/customerController');
 
 const { protect, restrictTo } = require('../middleware/auth');
 
 const router = express.Router();
 
-
 // ─── PROFILE ─────────────────────────────────────────────
 
-// Get logged-in customer profile
-router.get(
-  '/profile',
-  protect,
-  restrictTo('customer'),
-  getProfile
-);
-
-// Update logged-in customer profile
-router.put(
-  '/profile',
-  protect,
-  restrictTo('customer'),
-  updateProfile
-);
-
+router.get('/profile', protect, restrictTo('customer'), getProfile);
+router.put('/profile', protect, restrictTo('customer'), updateProfile);
+router.put('/profile/email', protect, restrictTo('customer'), updateEmail);
 
 // ─── ADDRESSES ───────────────────────────────────────────
 
-// Add address
-router.post(
-  '/addresses',
-  protect,
-  restrictTo('customer'),
-  addAddress
-);
+router.post('/addresses', protect, restrictTo('customer'), addAddress);
+router.put('/addresses/:addressId', protect, restrictTo('customer'), updateAddress);
+router.delete('/addresses/:addressId', protect, restrictTo('customer'), deleteAddress);
+router.put('/addresses/:addressId/default', protect, restrictTo('customer'), setDefaultAddress);
 
-// Update address
-router.put(
-  '/addresses/:addressId',
-  protect,
-  restrictTo('customer'),
-  updateAddress
-);
+// ─── PUSH TOKEN ──────────────────────────────────────────
 
-// Delete address
-router.delete(
-  '/addresses/:addressId',
-  protect,
-  restrictTo('customer'),
-  deleteAddress
-);
-
-// Set default address
-router.put(
-  '/addresses/:addressId/default',
-  protect,
-  restrictTo('customer'),
-  setDefaultAddress
-);
-
-router.patch("/push-token", protect, async (req, res) => {
+router.patch('/push-token', protect, async (req, res) => {
   await Customer.findByIdAndUpdate(req.user.id, { expoPushToken: req.body.expoPushToken });
   res.json({ success: true });
 });

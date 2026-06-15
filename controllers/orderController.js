@@ -237,8 +237,6 @@ exports.getOrderDetails =
   };
 
 
-
-
 // Update status
 
 exports.updateStatus =
